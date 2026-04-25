@@ -1,0 +1,42 @@
+@model PlataformaCreditos.Models.SolicitudCredito
+
+@{
+    ViewData["Title"] = "Rechazar Solicitud";
+}
+
+<h1>Rechazar Solicitud #@Model.Id</h1>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card mb-4">
+            <div class="card-header bg-danger text-white">Detalles de la Solicitud</div>
+            <ul class="list-group list-group-flush">
+                <li class="list-group-item"><strong>Cliente:</strong> @Model.Cliente.UsuarioId</li>
+                <li class="list-group-item"><strong>Ingresos Mensuales:</strong> @Model.Cliente.IngresosMensuales.ToString("C")</li>
+                <li class="list-group-item"><strong>Monto Solicitado:</strong> @Model.MontoSolicitado.ToString("C")</li>
+                <li class="list-group-item"><strong>Fecha:</strong> @Model.FechaSolicitud.ToString("dd/MM/yyyy HH:mm")</li>
+            </ul>
+        </div>
+
+        <form asp-action="Rechazar" method="post">
+            <input type="hidden" asp-for="Id" />
+            <div class="mb-3">
+                <label for="motivoRechazo" class="form-label">Motivo de Rechazo <span class="text-danger">*</span></label>
+                <textarea id="motivoRechazo" name="motivoRechazo" class="form-control" rows="4" required></textarea>
+                @if (ViewData.ModelState.ErrorCount > 0)
+                {
+                    <div class="text-danger mt-1">@Html.ValidationMessage("motivoRechazo")</div>
+                }
+            </div>
+            
+            <div class="mb-3">
+                <button type="submit" class="btn btn-danger">Confirmar Rechazo</button>
+                <a asp-action="Index" class="btn btn-secondary">Cancelar</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}
