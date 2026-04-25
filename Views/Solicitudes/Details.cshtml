@@ -1,0 +1,46 @@
+@model PlataformaCreditos.Models.SolicitudCredito
+
+@{
+    ViewData["Title"] = "Detalle de Solicitud";
+}
+
+<h1>Detalle de Solicitud #@Model.Id</h1>
+
+<div>
+    <hr />
+    <dl class="row">
+        <dt class="col-sm-2">
+            Fecha de Solicitud
+        </dt>
+        <dd class="col-sm-10">
+            @Model.FechaSolicitud.ToString("dd/MM/yyyy HH:mm")
+        </dd>
+        <dt class="col-sm-2">
+            Monto Solicitado
+        </dt>
+        <dd class="col-sm-10">
+            @Model.MontoSolicitado.ToString("C")
+        </dd>
+        <dt class="col-sm-2">
+            Estado
+        </dt>
+        <dd class="col-sm-10">
+            @if(Model.Estado == PlataformaCreditos.Models.EstadoSolicitud.Aprobado) { <span class="badge bg-success">Aprobado</span> }
+            else if(Model.Estado == PlataformaCreditos.Models.EstadoSolicitud.Rechazado) { <span class="badge bg-danger">Rechazado</span> }
+            else { <span class="badge bg-warning text-dark">Pendiente</span> }
+        </dd>
+
+        @if (Model.Estado == PlataformaCreditos.Models.EstadoSolicitud.Rechazado && !string.IsNullOrEmpty(Model.MotivoRechazo))
+        {
+            <dt class="col-sm-2 text-danger">
+                Motivo del Rechazo
+            </dt>
+            <dd class="col-sm-10 text-danger">
+                @Model.MotivoRechazo
+            </dd>
+        }
+    </dl>
+</div>
+<div>
+    <a asp-action="Index" class="btn btn-secondary">Volver a la lista</a>
+</div>
