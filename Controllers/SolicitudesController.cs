@@ -84,4 +84,65 @@ public class SolicitudesController : Controller
 
         return View(solicitud);
     }
+
+    public IActionResult Create()
+    {
+        return View();
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Create(CreateSolicitudViewModel model)
+    {
+        if (!ModelState.IsValid)
+        {
+            return View(model);
+        }
+
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        var cliente = await _context.Clientes.FirstOrDefaultAsync(c => c.UsuarioId == userId);
+
+        if (cliente == null)
+        {
+            return NotFound();
+        }
+
+        // Regla: Cliente debe estar activo
+        if (!cliente.Activo)
+        {
+            ModelState.AddModelError("", "Tu cuenta de cliente no está activa. No puedes solicitar créditos.");
+            return View(model);
+        }
+
+        // Regla: No permitir más de una solicitud Pendiente por cliente.
+        var tienePendiente = await _context.SolicitudesCredito
+            .AnyAsync(s => s.ClienteId == cliente.Id && s.Estado == EstadoSolicitud.Pendiente);
+        
+        if (tienePendiente)
+        {
+            ModelState.AddModelError("", "Ya tienes una solicitud en estado Pendiente. Debes esperar a que sea evaluada.");
+            return View(model);
+        }
+
+        // Regla: El monto solicitado no puede superar 10 veces los ingresos mensuales.
+        if (model.MontoSolicitado > (cliente.IngresosMensuales * 10))
+        {
+            ModelState.AddModelError("MontoSolicitado", $"El monto no puede superar 10 veces tus ingresos mensuales (Máx: {(cliente.IngresosMensuales * 10):C}).");
+            return View(model);
+        }
+
+        var nuevaSolicitud = new SolicitudCredito
+        {
+            ClienteId = cliente.Id,
+            MontoSolicitado = model.MontoSolicitado,
+            FechaSolicitud = DateTime.UtcNow,
+            Estado = EstadoSolicitud.Pendiente
+        };
+
+        _context.SolicitudesCredito.Add(nuevaSolicitud);
+        await _context.SaveChangesAsync();
+
+        TempData["Success"] = "Solicitud creada con éxito. Pronto será evaluada.";
+        return RedirectToAction(nameof(Index));
+    }
 }
