@@ -33,6 +33,24 @@
                             </li>
                         }
                     </ul>
+                    
+                    @using Microsoft.AspNetCore.Http
+                    @inject IHttpContextAccessor HttpContextAccessor
+                    
+                    @{
+                        var ultimaId = HttpContextAccessor.HttpContext?.Session?.GetString("UltimaSolicitudId");
+                        var ultimaMonto = HttpContextAccessor.HttpContext?.Session?.GetString("UltimaSolicitudMonto");
+                    }
+
+                    @if (!string.IsNullOrEmpty(ultimaId))
+                    {
+                        <div class="navbar-text me-3">
+                            <a asp-controller="Solicitudes" asp-action="Details" asp-route-id="@ultimaId" class="badge bg-info text-white text-decoration-none">
+                                Última vista: @ultimaMonto
+                            </a>
+                        </div>
+                    }
+
                     <partial name="_LoginPartial" />
                 </div>
             </div>

@@ -4,6 +4,8 @@ using Microsoft.EntityFrameworkCore;
 using PlataformaCreditos.Data;
 using PlataformaCreditos.Models;
 using System.Security.Claims;
+using Microsoft.Extensions.Caching.Distributed;
+using Newtonsoft.Json;
 
 namespace PlataformaCreditos.Controllers;
 
@@ -11,10 +13,12 @@ namespace PlataformaCreditos.Controllers;
 public class SolicitudesController : Controller
 {
     private readonly ApplicationDbContext _context;
+    private readonly IDistributedCache _cache;
 
-    public SolicitudesController(ApplicationDbContext context)
+    public SolicitudesController(ApplicationDbContext context, IDistributedCache cache)
     {
         _context = context;
+        _cache = cache;
     }
 
     public async Task<IActionResult> Index(SolicitudesFilterViewModel filter)
@@ -34,11 +38,36 @@ public class SolicitudesController : Controller
         }
 
         var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        string cacheKey = $"solicitudes_{userId}";
         
-        var query = _context.SolicitudesCredito
-            .Include(s => s.Cliente)
-            .Where(s => s.Cliente.UsuarioId == userId)
-            .AsQueryable();
+        List<SolicitudCredito> listaSolicitudes;
+        var cacheData = await _cache.GetStringAsync(cacheKey);
+
+        if (string.IsNullOrEmpty(cacheData))
+        {
+            listaSolicitudes = await _context.SolicitudesCredito
+                .Include(s => s.Cliente)
+                .Where(s => s.Cliente.UsuarioId == userId)
+                .OrderByDescending(s => s.FechaSolicitud)
+                .ToListAsync();
+
+            var cacheOptions = new DistributedCacheEntryOptions
+            {
+                AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(60)
+            };
+
+            var json = JsonConvert.SerializeObject(listaSolicitudes, new JsonSerializerSettings
+            {
+                ReferenceLoopHandling = ReferenceLoopHandling.Ignore
+            });
+            await _cache.SetStringAsync(cacheKey, json, cacheOptions);
+        }
+        else
+        {
+            listaSolicitudes = JsonConvert.DeserializeObject<List<SolicitudCredito>>(cacheData) ?? new List<SolicitudCredito>();
+        }
+
+        var query = listaSolicitudes.AsEnumerable();
 
         if (ModelState.IsValid)
         {
@@ -66,7 +95,7 @@ public class SolicitudesController : Controller
             }
         }
 
-        filter.Solicitudes = await query.OrderByDescending(s => s.FechaSolicitud).ToListAsync();
+        filter.Solicitudes = query.ToList();
         return View(filter);
     }
 
@@ -81,6 +110,10 @@ public class SolicitudesController : Controller
         {
             return NotFound();
         }
+
+        // Guardar en sesión
+        HttpContext.Session.SetString("UltimaSolicitudId", solicitud.Id.ToString());
+        HttpContext.Session.SetString("UltimaSolicitudMonto", solicitud.MontoSolicitado.ToString("C"));
 
         return View(solicitud);
     }
@@ -141,6 +174,9 @@ public class SolicitudesController : Controller
 
         _context.SolicitudesCredito.Add(nuevaSolicitud);
         await _context.SaveChangesAsync();
+
+        // Invalidar cache
+        await _cache.RemoveAsync($"solicitudes_{userId}");
 
         TempData["Success"] = "Solicitud creada con éxito. Pronto será evaluada.";
         return RedirectToAction(nameof(Index));
